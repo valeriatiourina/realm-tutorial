@@ -1,83 +1,54 @@
-import * as React from "react";
-import { useRealmApp } from "../realm/RealmApp";
-
+import React from "react";
+import * as Realm from "realm-web";
+import { useRealmApp } from "../RealmApp";
 import styled from "@emotion/styled";
 import Button from "@leafygreen-ui/button";
 import TextInput from "@leafygreen-ui/text-input";
-import Card from "@leafygreen-ui/card";
+import LGCard from "./Card";
 import { uiColors } from "@leafygreen-ui/palette";
 import validator from "validator";
+import Loading from "./Loading";
 
-const LoginScreen: React.FC = () => {
+export default function LoginScreen() {
   const app = useRealmApp();
-
   // Toggle between logging users in and registering new users
-  const [mode, setMode] = React.useState<"login" | "register">("login");
+  const [mode, setMode] = React.useState("login");
   const toggleMode = () => {
     setMode((oldMode) => (oldMode === "login" ? "register" : "login"));
   };
-
   // Keep track of form input state
-  const [email, setEmail] = React.useState<string>("");
-  const [password, setPassword] = React.useState<string>("");
+  const [email, setEmail] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  // Keep track of input validation/errors
+  const [error, setError] = React.useState({});
   // Whenever the mode changes, clear the form inputs
   React.useEffect(() => {
-    setEmail("");
-    setPassword("");
+    setEmail("nick.larew@mongodb.com");
+    setPassword("password");
     setError({});
   }, [mode]);
-  // Keep track of input validation/errors
-  const [error, setError] = React.useState<{
-    email?: string;
-    password?: string;
-  }>({});
 
-  function handleAuthenticationError(err: Error) {
-    console.error(err);
-    const { status, message } = parseAuthenticationError(err);
-    const errorType = message || status;
-    switch (errorType) {
-      case "invalid username":
-        setError((prevErr) => ({ ...prevErr, email: "Invalid email address." }));
-        break;
-      case "invalid username/password":
-      case "invalid password":
-      case "401":
-        setError((err) => ({ ...err, password: "Incorrect password." }));
-        break;
-      case "name already in use":
-      case "409":
-        setError((err) => ({ ...err, email: "Email is already registered." }));
-        break;
-      case "password must be between 6 and 128 characters":
-      case "400":
-        setError((err) => ({
-          ...err,
-          password: "Password must be between 6 and 128 characters.",
-        }));
-        break;
-    }
-  }
-
+  const [isLoggingIn, setIsLoggingIn] = React.useState(false);
   const handleLogin = async () => {
-    setError((e) => ({ ...e, password: undefined }));
+    setIsLoggingIn(true);
+    setError((e) => ({ ...e, password: null }));
     try {
-      return await app.logIn(email, password);
+      await app.logIn(Realm.Credentials.emailPassword(email, password));
     } catch (err) {
-      handleAuthenticationError(err);
+      handleAuthenticationError(err, setError);
     }
   };
 
   const handleRegistrationAndLogin = async () => {
     const isValidEmailAddress = validator.isEmail(email);
-    setError((e) => ({ ...e, password: undefined }));
+    setError((e) => ({ ...e, password: null }));
     if (isValidEmailAddress) {
       try {
         // Register the user and, if successful, log them in
-        await app.registerUser(email, password);
+        await app.emailPasswordAuth.registerUser(email, password);
         return await handleLogin();
       } catch (err) {
-        handleAuthenticationError(err);
+        handleAuthenticationError(err, setError);
       }
     } else {
       setError((err) => ({ ...err, email: "Email is invalid." }));
@@ -86,8 +57,10 @@ const LoginScreen: React.FC = () => {
 
   return (
     <Container>
-      <Card>
-        <Layout>
+      {isLoggingIn ? (
+        <Loading />
+      ) : (
+        <Card>
           <LoginFormRow>
             <LoginHeading>
               {mode === "login" ? "Log In" : "Register an Account"}
@@ -99,7 +72,7 @@ const LoginScreen: React.FC = () => {
               label="Email"
               placeholder="your.email@example.com"
               onChange={(e) => {
-                setError((e) => ({ ...e, email: undefined }));
+                setError((e) => ({ ...e, email: null }));
                 setEmail(e.target.value);
               }}
               value={email}
@@ -117,6 +90,7 @@ const LoginScreen: React.FC = () => {
             <TextInput
               type="password"
               label="Password"
+              placeholder="pa55w0rd"
               onChange={(e) => {
                 setPassword(e.target.value);
               }}
@@ -146,7 +120,7 @@ const LoginScreen: React.FC = () => {
                 : "Already have an account?"}
             </ToggleText>
             <ToggleLink
-              onClick={(e: React.MouseEvent) => {
+              onClick={(e) => {
                 e.preventDefault();
                 toggleMode();
               }}
@@ -154,14 +128,41 @@ const LoginScreen: React.FC = () => {
               {mode === "login" ? "Register one now." : "Log in instead."}
             </ToggleLink>
           </ToggleContainer>
-        </Layout>
-      </Card>
+        </Card>
+      )}
     </Container>
   );
-};
-export default LoginScreen;
+}
 
-function parseAuthenticationError(err: Error) {
+function handleAuthenticationError(err, setError) {
+  const { status, message } = parseAuthenticationError(err);
+  const errorType = message || status;
+  switch (errorType) {
+    case "invalid username":
+      setError((prevErr) => ({ ...prevErr, email: "Invalid email address." }));
+      break;
+    case "invalid username/password":
+    case "invalid password":
+    case "401":
+      setError((err) => ({ ...err, password: "Incorrect password." }));
+      break;
+    case "name already in use":
+    case "409":
+      setError((err) => ({ ...err, email: "Email is already registered." }));
+      break;
+    case "password must be between 6 and 128 characters":
+    case "400":
+      setError((err) => ({
+        ...err,
+        password: "Password must be between 6 and 128 characters.",
+      }));
+      break;
+    default:
+      break;
+  }
+}
+
+function parseAuthenticationError(err) {
   const parts = err.message.split(":");
   const reason = parts[parts.length - 1].trimStart();
   if (!reason) return { status: "", message: "" };
@@ -171,6 +172,9 @@ function parseAuthenticationError(err: Error) {
   return { status, message };
 }
 
+const Card = styled(LGCard)`
+  width: 420px;
+`;
 const ToggleContainer = styled.div`
   margin-top: 8px;
   font-size: 12px;
@@ -192,17 +196,10 @@ const ToggleLink = styled.button`
 const Container = styled.div`
   height: 100vh;
   justify-content: center;
+  align-items: center;
   display: flex;
   flex-direction: column;
-`;
-
-const Layout = styled.div`
-  padding: 8px;
-  color: black;
-  width: 400px;
-  display: flex;
-  flex-direction: column;
-  text-align: left;
+  background: ${uiColors.gray.light2};
 `;
 
 const LoginHeading = styled.h1`
