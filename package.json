@@ -1,0 +1,23 @@
+{
+  "name": "realm-tutorial",
+  "version": "1.0.0",
+  "description": "The Task Tracker is a collaborative project management tool.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/valeriatiourina/realm-tutorial.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/valeriatiourina/realm-tutorial/issues"
+  },
+  "homepage": "https://github.com/valeriatiourina/realm-tutorial#readme",
+  "dependencies": {
+    "axios": "^0.20.0"
+  }
+}
